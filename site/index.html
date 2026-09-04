@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Walls · Wallpaper Gallery</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">walls</a>
+    <nav class="nav">
+      <a href="#/" data-nav="home">Home</a>
+      <a href="#/random" data-nav="random">Random</a>
+      <a href="#/popular" data-nav="popular">Popular</a>
+      <a href="https://github.com/jcbl1/walls" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="app" class="app">
+    <noscript><p class="panel">JavaScript is required to browse this gallery.</p></noscript>
+  </main>
+
+  <footer class="footer">
+    <p>I do not own these images. All credits belong to the respective artists.</p>
+  </footer>
+
+  <div id="lightbox" class="lightbox" hidden>
+    <div class="lightbox-backdrop" data-action="close"></div>
+    <figure class="lb-stage">
+      <div class="lb-media" id="lb-media"></div>
+      <figcaption class="lb-caption" id="lb-caption"></figcaption>
+    </figure>
+    <button class="lb-btn lb-close" data-action="close" type="button" aria-label="Close">&#x2715;</button>
+    <button class="lb-btn lb-prev" data-action="prev" type="button" aria-label="Previous">&#x2039;</button>
+    <button class="lb-btn lb-next" data-action="next" type="button" aria-label="Next">&#x203A;</button>
+  </div>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

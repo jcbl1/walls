@@ -73,7 +73,7 @@ def handle_body(_, string: str, config: dict[str, str]) -> str:
 def handle_category(_, string: str, config: dict[str, str]) -> dict[str, str]:
     results = {}
     spacing = "\n" * int(config["spacing"])
-    for category, pictures in categorical_wallpapers().items():
+    for category, pictures in categorical_wallpapers(config["exclude"]).items():
         readme = f"{category}/README.md"
         results[readme] = f"# {category}\n\n"
         for picture in pictures:
