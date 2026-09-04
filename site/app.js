@@ -44,6 +44,11 @@ function fileURL(file) {
   return encodeURI(`${state.manifest.base_url}/${file.path}`);
 }
 
+function thumbURL(file) {
+  if (!state.manifest.thumbs_base) return null;
+  return encodeURI(`${state.manifest.thumbs_base}/${file.path}.webp`);
+}
+
 function categoryURL(name) {
   return `#/c/${encodeURIComponent(name)}`;
 }
@@ -108,10 +113,21 @@ function el(tag, attrs = {}, ...children) {
 
 function mediaNode(file, lazy = true) {
   const url = fileURL(file);
+  const thumb = thumbURL(file);
   if (file.kind === "video") {
-    return el("video", { src: url, muted: "", loop: "", playsinline: "", preload: "metadata" });
+    return el("video", { src: url, poster: thumb, muted: "", loop: "", playsinline: "", preload: "none" });
   }
-  return el("img", { src: url, alt: file.stem, loading: lazy ? "lazy" : "eager", decoding: "async" });
+  const image = el("img", {
+    src: thumb ?? url,
+    alt: file.stem,
+    loading: lazy ? "lazy" : "eager",
+    decoding: "async",
+    onerror: () => {
+      image.onerror = null;
+      image.src = url;
+    },
+  });
+  return image;
 }
 
 function grid(files) {

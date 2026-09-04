@@ -105,6 +105,7 @@ def build_manifest(config: dict[str, str], categories: dict[str, list[dict]], ba
         "version": MANIFEST_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "base_url": base_url,
+        "thumbs_base": "./thumbs",
         "categories": [
             {
                 "name": name,

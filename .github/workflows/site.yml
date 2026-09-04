@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "**/README.md"
   workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
 
 permissions:
   contents: read
@@ -25,10 +29,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Restore thumbnails
+        uses: actions/cache@v4
+        with:
+          path: site/thumbs
+          key: thumbs-v1-${{ github.run_id }}
+          restore-keys: |
+            thumbs-v1-
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Install Pillow
+        run: python3 -m pip install --quiet pillow
       - name: Generate manifest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./.github/sitegen.py --ci
+      - name: Generate thumbnails
+        run: ./.github/thumbgen.py
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload site
