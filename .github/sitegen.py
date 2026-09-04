@@ -145,6 +145,9 @@ def main() -> None:
     target = Path(config.get("manifest", "site/manifest.json"))
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(dumps(manifest, indent=2) + "\n")
+    stats = target.parent / "stats.json"
+    if not stats.exists():
+        stats.write_text(dumps({}) + "\n")
     total = sum(category["count"] for category in manifest["categories"])
     print(f"sitegen: wrote {target} ({len(manifest['categories'])} categories, {total} files, mode={mode})")
 
