@@ -8,10 +8,11 @@ const lbContext = { items: [], index: -1 };
 
 const BATCH_SIZE = 48;
 const BATCH_ROOT_MARGIN = "800px 0px";
+const COLUMN_GAP = 14;
 
 async function ensureManifest() {
   if (!state.manifest) {
-    const res = await fetch("./manifest.json");
+    const res = await fetch("./manifest.json", { cache: "no-cache" });
     if (!res.ok) throw new Error(`manifest.json HTTP ${res.status}`);
     state.manifest = await res.json();
   }
@@ -150,10 +151,14 @@ function disposeGrids(root) {
 }
 
 function grid(files) {
-  const masonry = el("div", { class: "masonry" });
-  const host = el("div", { class: "grid" }, masonry);
+  const host = el("div", { class: "grid" });
+  const row = el("div", { class: "grid-cols" });
   const sentinel = el("div", { class: "grid-sentinel" });
+  host.append(row);
+  let columns = [];
+  const placed = [];
   let index = 0;
+  let frame = 0;
 
   const card = (file, position) =>
     el(
@@ -162,17 +167,54 @@ function grid(files) {
       mediaNode(file, true, true)
     );
 
-  const observePosters = () => {
-    for (const video of masonry.querySelectorAll("video[data-poster]")) observer.observe(video);
+  const columnCount = (width) =>
+    width <= 640
+      ? Math.max(1, Math.min(2, Math.floor((width + COLUMN_GAP) / (140 + COLUMN_GAP))))
+      : Math.max(1, Math.min(4, Math.floor((width + COLUMN_GAP) / (240 + COLUMN_GAP))));
+
+  const buildColumns = () => {
+    const count = columnCount(host.clientWidth || 1);
+    row.replaceChildren(...Array.from({ length: count }, () => el("div", { class: "col" })));
+    columns = [...row.children].map((node) => ({ node, height: 0 }));
+  };
+
+  const measureColumns = () => {
+    for (const column of columns) {
+      let height = 0;
+      for (const node of column.node.children) height += node.offsetHeight + COLUMN_GAP;
+      column.height = height;
+    }
+  };
+
+  const shortestColumn = () => columns.reduce((a, b) => (b.height < a.height ? b : a));
+
+  const estimatedHeight = (file) => {
+    const width = columns[0].node.clientWidth || 200;
+    const ratio = file.width && file.height ? file.width / file.height : 16 / 9;
+    return (width - 2) / ratio + 2;
   };
 
   const loadMore = () => {
     const end = Math.min(index + BATCH_SIZE, files.length);
-    const fragment = document.createDocumentFragment();
-    for (; index < end; index++) fragment.append(card(files[index], index));
-    masonry.append(fragment);
-    observePosters();
+    for (; index < end; index++) {
+      const node = card(files[index], index);
+      placed.push(node);
+      const target = shortestColumn();
+      target.node.append(node);
+      target.height += estimatedHeight(files[index]) + COLUMN_GAP;
+    }
+    measureColumns();
+    for (const video of host.querySelectorAll("video[data-poster]")) observer.observe(video);
     return index >= files.length;
+  };
+
+  const rebuild = () => {
+    buildColumns();
+    for (const node of placed) {
+      const target = shortestColumn();
+      target.node.append(node);
+      target.height += node.offsetHeight + COLUMN_GAP;
+    }
   };
 
   const observer = new IntersectionObserver(
@@ -185,6 +227,8 @@ function grid(files) {
           if (loadMore()) {
             sentinel.remove();
             observer.disconnect();
+          } else {
+            observer.observe(sentinel);
           }
         } else if (target.dataset.poster) {
           target.setAttribute("poster", target.dataset.poster);
@@ -195,11 +239,26 @@ function grid(files) {
     { rootMargin: BATCH_ROOT_MARGIN }
   );
 
-  if (!loadMore()) {
-    host.append(sentinel);
-    observer.observe(sentinel);
-  }
-  host.cleanupGrid = () => observer.disconnect();
+  const onResize = () => {
+    if (host.isConnected && columns.length && columnCount(host.clientWidth) !== columns.length) rebuild();
+  };
+
+  frame = requestAnimationFrame(() => {
+    frame = 0;
+    if (!host.isConnected) return;
+    buildColumns();
+    if (!loadMore()) {
+      host.append(sentinel);
+      observer.observe(sentinel);
+    }
+  });
+
+  window.addEventListener("resize", onResize);
+  host.cleanupGrid = () => {
+    if (frame) cancelAnimationFrame(frame);
+    window.removeEventListener("resize", onResize);
+    observer.disconnect();
+  };
   return host;
 }
 

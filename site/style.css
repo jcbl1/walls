@@ -148,9 +148,15 @@ h2 {
   padding: 56px 24px;
 }
 
-.masonry {
-  columns: 4 240px;
-  column-gap: 14px;
+.grid-cols {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.grid-cols > .col {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .card {
@@ -395,10 +401,6 @@ h2 {
 @media (max-width: 640px) {
   .app {
     padding: 16px 12px 48px;
-  }
-
-  .masonry {
-    columns: 2 140px;
   }
 
   .lb-btn {
