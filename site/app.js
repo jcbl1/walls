@@ -6,6 +6,9 @@ const lbCaption = document.getElementById("lb-caption");
 const state = { manifest: null, statsLoaded: false };
 const lbContext = { items: [], index: -1 };
 
+const BATCH_SIZE = 48;
+const BATCH_ROOT_MARGIN = "800px 0px";
+
 async function ensureManifest() {
   if (!state.manifest) {
     const res = await fetch("./manifest.json");
@@ -111,15 +114,27 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-function mediaNode(file, lazy = true) {
+function mediaNode(file, lazy = true, deferPoster = false) {
   const url = fileURL(file);
   const thumb = thumbURL(file);
   if (file.kind === "video") {
-    return el("video", { src: url, poster: thumb, muted: "", loop: "", playsinline: "", preload: "none" });
+    const ratio = file.width && file.height ? `aspect-ratio: ${file.width} / ${file.height}` : null;
+    return el("video", {
+      src: url,
+      muted: "",
+      loop: "",
+      playsinline: "",
+      preload: "none",
+      poster: deferPoster ? null : thumb,
+      "data-poster": deferPoster ? thumb : null,
+      style: ratio,
+    });
   }
   const image = el("img", {
     src: thumb ?? url,
     alt: file.stem,
+    width: file.width ?? null,
+    height: file.height ?? null,
     loading: lazy ? "lazy" : "eager",
     decoding: "async",
     onerror: () => {
@@ -130,18 +145,62 @@ function mediaNode(file, lazy = true) {
   return image;
 }
 
+function disposeGrids(root) {
+  root.querySelectorAll(".grid").forEach((node) => node.cleanupGrid?.());
+}
+
 function grid(files) {
-  const wrap = el("div", { class: "masonry" });
-  files.forEach((file, index) => {
-    wrap.append(
-      el(
-        "button",
-        { class: "card", type: "button", "aria-label": file.stem, onclick: () => openLightbox(files, index) },
-        mediaNode(file)
-      )
+  const masonry = el("div", { class: "masonry" });
+  const host = el("div", { class: "grid" }, masonry);
+  const sentinel = el("div", { class: "grid-sentinel" });
+  let index = 0;
+
+  const card = (file, position) =>
+    el(
+      "button",
+      { class: "card", type: "button", "aria-label": file.stem, onclick: () => openLightbox(files, position) },
+      mediaNode(file, true, true)
     );
-  });
-  return wrap;
+
+  const observePosters = () => {
+    for (const video of masonry.querySelectorAll("video[data-poster]")) observer.observe(video);
+  };
+
+  const loadMore = () => {
+    const end = Math.min(index + BATCH_SIZE, files.length);
+    const fragment = document.createDocumentFragment();
+    for (; index < end; index++) fragment.append(card(files[index], index));
+    masonry.append(fragment);
+    observePosters();
+    return index >= files.length;
+  };
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const target = entry.target;
+        observer.unobserve(target);
+        if (target === sentinel) {
+          if (loadMore()) {
+            sentinel.remove();
+            observer.disconnect();
+          }
+        } else if (target.dataset.poster) {
+          target.setAttribute("poster", target.dataset.poster);
+          target.removeAttribute("data-poster");
+        }
+      }
+    },
+    { rootMargin: BATCH_ROOT_MARGIN }
+  );
+
+  if (!loadMore()) {
+    host.append(sentinel);
+    observer.observe(sentinel);
+  }
+  host.cleanupGrid = () => observer.disconnect();
+  return host;
 }
 
 function openLightbox(items, index) {
@@ -303,7 +362,10 @@ function viewCategory(name) {
     else files = files.slice().sort((a, b) => a.stem.localeCompare(b.stem));
     return files;
   };
-  const rerender = () => gridHost.replaceChildren(grid(apply()));
+  const rerender = () => {
+    disposeGrids(gridHost);
+    gridHost.replaceChildren(grid(apply()));
+  };
 
   const search = el("input", {
     class: "input",
@@ -360,7 +422,10 @@ function viewRandom(params) {
   if (!files.length) return emptyState();
   const n = Math.min(Math.max(parseInt(params.get("n") || "6", 10) || 6, 1), 24);
   const host = el("div");
-  const draw = () => host.replaceChildren(grid(shuffled(files, (Math.random() * 2 ** 31) | 0).slice(0, n)));
+  const draw = () => {
+    disposeGrids(host);
+    host.replaceChildren(grid(shuffled(files, (Math.random() * 2 ** 31) | 0).slice(0, n)));
+  };
   draw();
   return el(
     "section",
@@ -425,6 +490,7 @@ async function render() {
         : route.name === "popular"
           ? viewPopular()
           : viewHome();
+  disposeGrids($app);
   $app.replaceChildren(view);
   window.scrollTo(0, 0);
 }
