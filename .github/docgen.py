@@ -5,7 +5,6 @@ from json import dumps
 from os import listdir
 from os.path import isfile
 from pathlib import Path
-from random import shuffle
 from typing import Callable
 
 
@@ -30,18 +29,6 @@ def get_templates() -> dict[str, str]:
     return {template: Path(f".github/templates/{template}").read_text() for template in listdir(".github/templates")}
 
 
-def generate_shuffled(
-    config: dict[str, str],
-    categories: dict[str, list[Path]],
-) -> dict[str, list[Path]]:
-    results = {}
-    choose = int(config["choose"])
-    for category, pictures in categories.items():
-        shuffle(pictures)
-        results[category] = pictures[:choose]
-    return results
-
-
 def prime_templates(
     config: dict[str, str],
     handlers: dict[str, Callable],
@@ -54,22 +41,6 @@ def prime_templates(
 
 
 # Handlers {{{
-def handle_body(_, string: str, config: dict[str, str]) -> str:
-    shuffled = generate_shuffled(config, categorical_wallpapers(config["exclude"]))
-    results = []
-    spacing = "\n" * int(config["spacing"])
-    for category, pictures in shuffled.items():
-        merged = {"category": category} | config
-        results.append(f"## {category}{spacing}")
-        for picture in pictures:
-            merged["random"] = str(picture)
-            merged["random_stem"] = picture.stem
-            results.append(string.format(**merged))
-        if config["browse"].casefold() == "True".casefold():
-            results.append(f"[Browse](../{category}/README.md){spacing}")
-    return spacing.join(results)
-
-
 def handle_category(_, string: str, config: dict[str, str]) -> dict[str, str]:
     results = {}
     spacing = "\n" * int(config["spacing"])
@@ -85,8 +56,8 @@ def handle_category(_, string: str, config: dict[str, str]) -> dict[str, str]:
 
 if __name__ == "__main__":
     CONFIG = get_config()
-    primed = prime_templates(CONFIG, {"body.category.md": handle_body, "category.md": handle_category})
-    full_templates = ["heading", "body.heading", "body.category", "sources", "conclusion"] # ordered
+    primed = prime_templates(CONFIG, {"category.md": handle_category})
+    full_templates = ["heading", "sources", "conclusion"] # ordered
     full_templates = [primed[f"{item}.md"] for item in full_templates]
     partial_template = primed["category.md"]
 
