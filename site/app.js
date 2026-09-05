@@ -283,6 +283,79 @@ function stepLightbox(delta) {
   showLightbox();
 }
 
+history.scrollRestoration = "manual";
+
+const scrollMemory = new Map();
+let currentUid = null;
+let traversing = false;
+let restoreToken = 0;
+let lastTraversalAt = -Infinity;
+const RESTORE_DEADLINE = 2000;
+
+function entryUid() {
+  const uid = history.state?.uid;
+  if (uid) return uid;
+  const fresh = `s${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  history.replaceState({ ...(history.state ?? {}), uid: fresh }, "");
+  return fresh;
+}
+
+function saveScroll() {
+  if (currentUid) scrollMemory.set(currentUid, window.scrollY);
+}
+
+function invalidateRestore() {
+  restoreToken++;
+}
+
+function restoreScroll() {
+  const token = ++restoreToken;
+  const target = Math.max(0, scrollMemory.get(currentUid) ?? 0);
+  const deadline = performance.now() + RESTORE_DEADLINE;
+  const detach = () => {
+    window.removeEventListener("wheel", cancel);
+    window.removeEventListener("touchmove", cancel);
+    window.removeEventListener("keydown", cancel);
+  };
+  const cancel = () => {
+    restoreToken = Math.max(restoreToken, token + 1);
+    detach();
+  };
+  let lastSet = null;
+  const nudge = () => {
+    if (token !== restoreToken) return detach();
+    if (lastSet != null && Math.abs(window.scrollY - lastSet) > 2) return cancel();
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    const y = Math.min(target, Math.max(0, max));
+    if (window.scrollY < y) {
+      window.scrollTo(0, y);
+      lastSet = y;
+    }
+    if (window.scrollY >= target || performance.now() > deadline) return cancel();
+    requestAnimationFrame(nudge);
+  };
+  window.addEventListener("wheel", cancel, { passive: true });
+  window.addEventListener("touchmove", cancel, { passive: true });
+  window.addEventListener("keydown", cancel);
+  requestAnimationFrame(nudge);
+}
+
+function onHashChange() {
+  if (performance.now() - lastTraversalAt < 100) return;
+  saveScroll();
+  traversing = false;
+  currentUid = entryUid();
+  render();
+}
+
+function onPopState() {
+  lastTraversalAt = performance.now();
+  saveScroll();
+  traversing = true;
+  currentUid = entryUid();
+  render();
+}
+
 function showLightbox() {
   const file = lbContext.items[lbContext.index];
   if (!file) return closeLightbox();
@@ -532,6 +605,7 @@ function viewPopular() {
 }
 
 async function render() {
+  invalidateRestore();
   const route = parseRoute();
   setActiveNav(route.name);
   try {
@@ -551,8 +625,11 @@ async function render() {
           : viewHome();
   disposeGrids($app);
   $app.replaceChildren(view);
-  window.scrollTo(0, 0);
+  if (traversing) restoreScroll();
+  else window.scrollTo(0, 0);
 }
 
-window.addEventListener("hashchange", render);
+currentUid = entryUid();
+window.addEventListener("hashchange", onHashChange);
+window.addEventListener("popstate", onPopState);
 render();
