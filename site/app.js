@@ -65,6 +65,25 @@ function fileNameOf(file) {
   return file.path.split("/").pop();
 }
 
+const STATS_PREFIX = "/walls";
+
+function countPageview(path, title) {
+  const gc = window.goatcounter;
+  if (typeof gc?.count !== "function") return;
+  try {
+    gc.count({ path, title, event: false });
+  } catch {
+    void 0;
+  }
+}
+
+function routePath(route) {
+  if (route.name === "category") return `${STATS_PREFIX}/c/${route.category}`;
+  if (route.name === "random") return `${STATS_PREFIX}/random`;
+  if (route.name === "popular") return `${STATS_PREFIX}/popular`;
+  return `${STATS_PREFIX}/`;
+}
+
 function fnv(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {
@@ -370,6 +389,7 @@ function showLightbox() {
     el("a", { class: "chip", href: categoryURL(categoryOf(file)) }, categoryOf(file)),
     el("button", { class: "btn", type: "button", onclick: () => downloadFile(file) }, "Download")
   );
+  countPageview(`${STATS_PREFIX}/w/${file.path}`, file.stem);
 }
 
 async function downloadFile(file) {
@@ -625,6 +645,7 @@ async function render() {
           : viewHome();
   disposeGrids($app);
   $app.replaceChildren(view);
+  countPageview(routePath(route), document.title);
   if (traversing) restoreScroll();
   else window.scrollTo(0, 0);
 }
