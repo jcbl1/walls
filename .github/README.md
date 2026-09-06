@@ -2,7 +2,7 @@
 
 This README is auto-generated. You may view its source code [here](docgen.py).
 
-Browse the full gallery at <https://jcbl1.github.io/walls>.
+Browse the full gallery at <https://jcbl1.github.io/walls-web>.
 
 ## Sources
 
